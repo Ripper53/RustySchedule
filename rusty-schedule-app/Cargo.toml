@@ -1,0 +1,13 @@
+[package]
+name = "rusty-schedule-app"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rusty-schedule-core = { path = "../rusty-schedule-core" }
+notify-rust = "4.10.0"
+directories = "5.0.1"
+tokio = { version = "1.36.0", features = ["full"] }
+clap = "4.4.18"
