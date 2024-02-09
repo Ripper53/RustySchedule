@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File, io::{self, Read, Write}, path::Path, time::SystemTime};
+use std::{collections::{hash_map::Entry, HashMap}, fs::File, io::{self, Read, Write}, path::Path, time::SystemTime};
 
 use chrono::{Local, NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Notifies use of reminders.
 #[derive(Serialize, Deserialize)]
 pub struct Notifier {
-    reminders: HashMap<NaiveTime, Reminder>,
+    reminders: HashMap<NaiveTime, Vec<Reminder>>,
     /// Latest reminder that was notified.
     #[serde(skip)]
     latest_notified: Option<NaiveTime>,
@@ -54,7 +54,8 @@ impl Notifier {
                         None
                     }
                 }
-            });
+            })
+            .flatten();
         self.latest_notified = Some(time);
         reminders
     }
@@ -62,12 +63,17 @@ impl Notifier {
 
 #[derive(Default)]
 pub struct NotifierBuilder {
-    reminders: HashMap<NaiveTime, Reminder>,
+    reminders: HashMap<NaiveTime, Vec<Reminder>>,
 }
 
 impl NotifierBuilder {
     pub fn notify(mut self, time: NaiveTime, reminder: Reminder) -> Self {
-        self.reminders.insert(time, reminder);
+        match self.reminders.entry(time) {
+            Entry::Occupied(e) => e.into_mut().push(reminder),
+            Entry::Vacant(e) => {
+                e.insert(vec![reminder]);
+            },
+        }
         self
     }
     pub fn finish(self) -> Notifier {

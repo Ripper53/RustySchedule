@@ -1,8 +1,11 @@
-use std::io::{self, stdout};
+use std::{io::{self, stdout}, str::FromStr};
 
 use crossterm::{execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand};
+use directories::ProjectDirs;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use rusty_schedule_core::{NotifierBuilder, Reminder};
 use tui_input::Input;
+use chrono::NaiveTime;
 
 use self::input::InputReturn;
 
@@ -65,7 +68,7 @@ impl UserInterfaceState {
         }
     }
     pub fn increment_task_selection(&mut self) {
-        if self.focused_task_index < self.tasks().len() - 1 {
+        if self.focused_task_index < self.tasks.len() - 1 {
             self.focus_type = TaskFocus::default();
             self.focused_task_index += 1;
         }
@@ -79,18 +82,45 @@ impl UserInterfaceState {
     pub fn focus_type(&self) -> TaskFocus {
         self.focus_type
     }
+    pub fn change_focus_type(&mut self) {
+        self.focus_type = match self.focus_type {
+            TaskFocus::Title => TaskFocus::Content,
+            TaskFocus::Content => TaskFocus::Time,
+            TaskFocus::Time => TaskFocus::Title,
+        };
+    }
+    pub fn save(&self) -> io::Result<()> {
+        let mut builder = NotifierBuilder::default();
+        for task in self.tasks() {
+            let time = NaiveTime::from_str(task.time.value()).unwrap();
+            builder = builder.notify(time, Reminder {
+                title: task.title.value().into(),
+                content: task.content.value().into(),
+            });
+        }
+        let notifier = builder.finish();
+        if let Some(dirs) = ProjectDirs::from("", "", "Rusty Notifier") {
+            let data_path = dirs.data_dir();
+            notifier.save(data_path.join("reminders.json"))?;
+            Ok(())
+        } else {
+            panic!("No home directory found");
+        }
+    }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Default)]
 pub enum TaskFocus {
     #[default]
     Title,
     Content,
+    Time,
 }
 
 pub struct Task {
     title: Input,
     content: Input,
+    time: Input,
 }
 
 impl Task {
@@ -98,6 +128,7 @@ impl Task {
         Task {
             title: "".into(),
             content: "".into(),
+            time: "0:00".into(),
         }
     }
 }

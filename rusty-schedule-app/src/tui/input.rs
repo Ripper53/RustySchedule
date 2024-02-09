@@ -8,20 +8,13 @@ use super::{TaskFocus, UserInterfaceState};
 pub fn tui_input(state: &mut UserInterfaceState) -> io::Result<Option<InputReturn>> {
     if event::poll(std::time::Duration::from_millis(100))? {
         let event = event::read()?;
-        match state.focus_type() {
-            TaskFocus::Title => {
-                let selected_task = state.get_focused_task_mut();
-                selected_task.title.handle_event(&event);
-            },
-            TaskFocus::Content => {
-                let selected_task = state.get_focused_task_mut();
-                selected_task.content.handle_event(&event);
-            },
-        }
         if let Event::Key(key) = event {
             if key.kind == KeyEventKind::Press {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     match key.code {
+                        KeyCode::Char('s') | KeyCode::Char('S') => {
+                            state.save()?;
+                        },
                         KeyCode::Char('n') | KeyCode::Char('N') => {
                             state.add_task();
                         },
@@ -36,8 +29,27 @@ pub fn tui_input(state: &mut UserInterfaceState) -> io::Result<Option<InputRetur
                         },
                         _ => {},
                     }
-                } else if key.code == KeyCode::Esc {
-                    return Ok(Some(InputReturn::Exit));
+                } else {
+                    match key.code {
+                        KeyCode::Esc => return Ok(Some(InputReturn::Exit)),
+                        KeyCode::Enter if !key.modifiers.contains(KeyModifiers::SHIFT) => state.change_focus_type(),
+                        _ => {
+                            match state.focus_type() {
+                                TaskFocus::Title => {
+                                    let selected_task = state.get_focused_task_mut();
+                                    selected_task.title.handle_event(&event);
+                                },
+                                TaskFocus::Content => {
+                                    let selected_task = state.get_focused_task_mut();
+                                    selected_task.content.handle_event(&event);
+                                },
+                                TaskFocus::Time => {
+                                    let selected_task = state.get_focused_task_mut();
+                                    selected_task.time.handle_event(&event);
+                                },
+                            }
+                        },
+                    }
                 }
             }
         }
