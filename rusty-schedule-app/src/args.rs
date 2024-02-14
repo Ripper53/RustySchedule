@@ -4,5 +4,6 @@ use clap::Parser;
 #[command(name = "Rusty Schedule", author = "Albar", version = "0.1", about = "Schedule notifications", long_about = None)]
 pub enum ScheduleCommand {
     Run,
+    #[cfg(feature = "tui")]
     UserInterface,
 }

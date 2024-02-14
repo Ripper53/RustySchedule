@@ -9,6 +9,7 @@ use rusty_schedule_core::{Notifier, NotifierBuilder};
 use tokio::{sync::mpsc::{channel, Receiver, Sender}, task::JoinHandle};
 
 mod args;
+#[cfg(feature = "tui")]
 mod tui;
 
 #[tokio::main]
@@ -18,7 +19,7 @@ async fn main() -> std::io::Result<()> {
         ScheduleCommand::Run => {
             if let Some(dirs) = ProjectDirs::from("", "", "Rusty Notifier") {
                 let data_path = dirs.data_dir();
-                let (sender, receiver) = channel(128);
+                let (sender, receiver) = channel(1);
                 let handler = match Notifier::load(data_path.join("reminders.json")) {
                     Ok(notifier) => listen(notifier, receiver),
                     Err(e) => panic!("Error loading reminders: {e}"),
@@ -28,6 +29,7 @@ async fn main() -> std::io::Result<()> {
                 panic!("No home directory found");
             }
         },
+        #[cfg(feature = "tui")]
         ScheduleCommand::UserInterface => {
             tui::tui_setup()?;
         },
@@ -42,7 +44,7 @@ enum ReminderEvent {
 fn listen(mut notifier: Notifier, mut receiver: Receiver<ReminderEvent>) -> JoinHandle<()> {
     tokio::spawn(async move {
         'main: loop {
-            while let Some(event) = receiver.recv().await {
+            while let Ok(event) = receiver.try_recv() {
                 match event {
                     ReminderEvent::Exit => break 'main,
                 }

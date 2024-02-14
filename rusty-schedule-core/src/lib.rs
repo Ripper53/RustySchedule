@@ -1,6 +1,6 @@
 use std::{collections::{hash_map::Entry, HashMap}, fs::File, io::{self, Read, Write}, path::Path, time::SystemTime};
 
-use chrono::{Local, NaiveTime, Timelike};
+use chrono::{Datelike, Local, NaiveTime, Timelike, Weekday};
 use serde::{Deserialize, Serialize};
 
 
@@ -37,7 +37,9 @@ impl Notifier {
     }
     /// Iterator of reminders yet to be notified.
     pub fn check_reminders(&mut self) -> impl Iterator<Item = &Reminder> {
-        let time = Local::now().naive_local().time();
+        let date = Local::now().naive_local();
+        let time = date.time();
+        let weekday = date.weekday();
         let latest_notified = self.latest_notified.clone();
         let reminders = self.reminders.iter()
             .filter_map(move |(reminder_time, reminder)| {
@@ -55,7 +57,14 @@ impl Notifier {
                     }
                 }
             })
-            .flatten();
+            .flatten()
+            .filter(move |reminder| {
+                if let Some(ref weekdays) = reminder.weekdays {
+                    weekdays.contains(&weekday)
+                } else {
+                    true
+                }
+            });
         self.latest_notified = Some(time);
         reminders
     }
@@ -88,4 +97,5 @@ impl NotifierBuilder {
 pub struct Reminder {
     pub title: String,
     pub content: String,
+    pub weekdays: Option<Vec<Weekday>>,
 }

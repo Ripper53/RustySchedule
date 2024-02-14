@@ -5,7 +5,7 @@ use tui_input::backend::crossterm::EventHandler;
 
 use super::{TaskFocus, UserInterfaceState};
 
-pub fn tui_input(state: &mut UserInterfaceState) -> io::Result<Option<InputReturn>> {
+pub fn tui_input<'a>(state: &mut UserInterfaceState<'a>) -> io::Result<Option<InputReturn>> {
     if event::poll(std::time::Duration::from_millis(100))? {
         let event = event::read()?;
         if let Event::Key(key) = event {
@@ -41,11 +41,11 @@ pub fn tui_input(state: &mut UserInterfaceState) -> io::Result<Option<InputRetur
                                 },
                                 TaskFocus::Content => {
                                     let selected_task = state.get_focused_task_mut();
-                                    selected_task.content.handle_event(&event);
+                                    selected_task.content.input(event);
                                 },
                                 TaskFocus::Time => {
                                     let selected_task = state.get_focused_task_mut();
-                                    selected_task.time.handle_event(&event);
+                                    selected_task.time.input(event);
                                 },
                             }
                         },
