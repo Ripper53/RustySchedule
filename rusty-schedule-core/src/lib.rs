@@ -64,6 +64,13 @@ impl Notifier {
                 } else {
                     true
                 }
+            })
+            .inspect(|reminder| {
+                if let Some(ref open) = reminder.open {
+                    if let Err(e) = open::that_detached(open) {
+                        println!("There was a problem opening: {open}—{e}");
+                    }
+                }
             });
         self.latest_notified = Some(time);
         reminders
@@ -98,4 +105,6 @@ pub struct Reminder {
     pub title: String,
     pub content: String,
     pub weekdays: Option<Vec<Weekday>>,
+    /// Application to open when reminder triggers.
+    pub open: Option<String>,
 }
