@@ -25,3 +25,4 @@ tui = [
 
 [profile.release]
 strip = true
+codegen-units = 1
