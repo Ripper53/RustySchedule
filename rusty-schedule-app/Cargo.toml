@@ -22,3 +22,6 @@ tui = [
     "dep:tui-textarea",
     "dep:tui-input",
 ]
+
+[profile.release]
+strip = true
