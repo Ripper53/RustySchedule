@@ -1,4 +1,4 @@
-use std::{io::{self, Write}, time::Duration};
+use std::{io::{self, Write}, sync::mpsc::{channel, Receiver, Sender}, thread::JoinHandle, time::Duration};
 
 use args::ScheduleCommand;
 use clap::Parser;
@@ -6,25 +6,23 @@ use crossterm::event::{self, Event, KeyCode};
 use directories::ProjectDirs;
 use notify_rust::Notification;
 use rusty_schedule_core::{Notifier, NotifierBuilder};
-use tokio::{sync::mpsc::{channel, Receiver, Sender}, task::JoinHandle};
 
 mod args;
 #[cfg(feature = "tui")]
 mod tui;
 
-#[tokio::main]
-async fn main() -> std::io::Result<()> {
+fn main() -> std::io::Result<()> {
     let command = ScheduleCommand::parse();
     match command {
         ScheduleCommand::Run => {
             if let Some(dirs) = ProjectDirs::from("", "", "Rusty Notifier") {
                 let data_path = dirs.data_dir();
-                let (sender, receiver) = channel(1);
+                let (sender, receiver) = channel();
                 let handler = match Notifier::load(data_path.join("reminders.json")) {
                     Ok(notifier) => listen(notifier, receiver),
                     Err(e) => panic!("Error loading reminders: {e}"),
                 };
-                controls(handler, sender).await?;
+                controls(handler, sender)?;
             } else {
                 panic!("No home directory found");
             }
@@ -42,7 +40,7 @@ enum ReminderEvent {
 }
 
 fn listen(mut notifier: Notifier, mut receiver: Receiver<ReminderEvent>) -> JoinHandle<()> {
-    tokio::spawn(async move {
+    std::thread::spawn(move || {
         'main: loop {
             while let Ok(event) = receiver.try_recv() {
                 match event {
@@ -57,12 +55,12 @@ fn listen(mut notifier: Notifier, mut receiver: Receiver<ReminderEvent>) -> Join
                     .timeout(0)
                     .show().unwrap();
             }
-            tokio::time::sleep(Duration::from_millis(200)).await;
+            std::thread::sleep(Duration::from_millis(200));
         }
     })
 }
 
-async fn controls(listener: JoinHandle<()>, sender: Sender<ReminderEvent>) -> io::Result<()> {
+fn controls(listener: JoinHandle<()>, sender: Sender<ReminderEvent>) -> io::Result<()> {
     println!("Reminders listening... Press ESC to stop.");
     loop {
         if event::poll(std::time::Duration::from_millis(100))? {
@@ -70,7 +68,7 @@ async fn controls(listener: JoinHandle<()>, sender: Sender<ReminderEvent>) -> io
             if let Event::Key(key) = event {
                 match key.code {
                     KeyCode::Esc => {
-                        sender.send(ReminderEvent::Exit).await.unwrap();
+                        sender.send(ReminderEvent::Exit).unwrap();
                         break;
                     },
                     _ => {},
