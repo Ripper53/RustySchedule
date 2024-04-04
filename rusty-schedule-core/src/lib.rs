@@ -67,8 +67,18 @@ impl Notifier {
             })
             .inspect(|reminder| {
                 if let Some(ref open) = reminder.open {
-                    if let Err(e) = open::that_detached(open) {
-                        println!("There was a problem opening: {open}—{e}");
+                    let execute_open = |open: &str| {
+                        if let Err(e) = open::that_detached(open) {
+                            println!("There was a problem opening: {open}—{e}");
+                        }
+                    };
+                    match open {
+                        ReminderOpen::Single(open) => execute_open(open),
+                        ReminderOpen::Multiple(open) => {
+                            for open in open {
+                                execute_open(open);
+                            }
+                        },
                     }
                 }
             });
@@ -106,5 +116,12 @@ pub struct Reminder {
     pub content: String,
     pub weekdays: Option<Vec<Weekday>>,
     /// Application to open when reminder triggers.
-    pub open: Option<String>,
+    pub open: Option<ReminderOpen>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ReminderOpen {
+    Single(String),
+    Multiple(Vec<String>),
 }

@@ -107,6 +107,8 @@ impl<'a> UserInterfaceState<'a> {
             builder = builder.notify(time, Reminder {
                 title: task.title.value().into(),
                 content: task.content.yank_text(),
+                weekdays: None,
+                open: None,
             });
         }
         let notifier = builder.finish();
@@ -133,6 +135,7 @@ pub struct Task<'a> {
     title_placeholder: String,
     content: TextArea<'a>,
     time: TextArea<'a>,
+    open: Vec<Input>,
 }
 
 impl Task<'_> {
@@ -146,6 +149,7 @@ impl Task<'_> {
             title_placeholder: "".into(),
             content,
             time,
+            open: Vec::new(),
         }
     }
 }
