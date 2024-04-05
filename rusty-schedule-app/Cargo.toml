@@ -15,9 +15,12 @@ crossterm = "0.27.0"
 chrono = "0.4.33"
 tui-textarea = { version = "0.4.0", optional = true }
 tui-input = { version = "0.8.0", optional = true }
+tray-icon = { version = "0.13.1", optional = true }
 
 [features]
 #default = ["tui"] -- TUI throws compile errors for now
+default = ["tray"]
+tray = ["dep:tray-icon"]
 tui = [
     "dep:ratatui",
     "dep:tui-textarea",

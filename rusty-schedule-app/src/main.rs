@@ -6,6 +6,8 @@ use crossterm::event::{self, Event, KeyCode};
 use directories::ProjectDirs;
 use notify_rust::Notification;
 use rusty_schedule_core::{Notifier, NotifierBuilder};
+#[cfg(feature = "tray")]
+use tray_icon::{TrayIconBuilder, TrayIcon, TrayIconEvent, menu::{Menu, MenuEvent}};
 
 mod args;
 #[cfg(feature = "tui")]
@@ -17,12 +19,23 @@ fn main() -> std::io::Result<()> {
         ScheduleCommand::Run => {
             if let Some(dirs) = ProjectDirs::from("", "", "Rusty Notifier") {
                 let data_path = dirs.data_dir();
-                let (sender, receiver) = channel();
-                let handler = match Notifier::load(data_path.join("reminders.json")) {
-                    Ok(notifier) => listen(notifier, receiver),
+                let (listener_sender, listener_receiver) = channel();
+                #[cfg(feature = "tray")]
+                let (tray_sender, tray_receiver) = channel();
+                #[cfg(feature = "tray")]
+                let tray_handler = create_tray_icon(tray_receiver);
+                let listener_handler = match Notifier::load(data_path.join("reminders.json")) {
+                    Ok(notifier) => listen(notifier, listener_receiver),
                     Err(e) => panic!("Error loading reminders: {e}"),
                 };
-                controls(handler, sender)?;
+                controls(
+                    listener_handler,
+                    listener_sender,
+                    #[cfg(feature = "tray")]
+                    tray_handler,
+                    #[cfg(feature = "tray")]
+                    tray_sender,
+                )?;
             } else {
                 panic!("No home directory found");
             }
@@ -60,7 +73,14 @@ fn listen(mut notifier: Notifier, mut receiver: Receiver<ReminderEvent>) -> Join
     })
 }
 
-fn controls(listener: JoinHandle<()>, sender: Sender<ReminderEvent>) -> io::Result<()> {
+fn controls(
+    listener_handler: JoinHandle<()>,
+    listener_sender: Sender<ReminderEvent>,
+    #[cfg(feature = "tray")]
+    tray_handler: JoinHandle<()>,
+    #[cfg(feature = "tray")]
+    tray_sender: Sender<ReminderEvent>,
+) -> io::Result<()> {
     println!("Reminders listening... Press ESC to stop.");
     loop {
         if event::poll(std::time::Duration::from_millis(100))? {
@@ -68,7 +88,8 @@ fn controls(listener: JoinHandle<()>, sender: Sender<ReminderEvent>) -> io::Resu
             if let Event::Key(key) = event {
                 match key.code {
                     KeyCode::Esc => {
-                        sender.send(ReminderEvent::Exit).unwrap();
+                        listener_sender.send(ReminderEvent::Exit).unwrap();
+                        tray_sender.send(ReminderEvent::Exit).unwrap();
                         break;
                     },
                     _ => {},
@@ -79,10 +100,35 @@ fn controls(listener: JoinHandle<()>, sender: Sender<ReminderEvent>) -> io::Resu
     print!("Closing listeners...");
     io::stdout().flush();
     loop {
-        if listener.is_finished() {
+        if listener_handler.is_finished() && tray_handler.is_finished() {
             break;
         }
     }
     println!(" Closed!");
     Ok(())
+}
+
+#[cfg(feature = "tray")]
+fn create_tray_icon(mut receiver: Receiver<ReminderEvent>) -> JoinHandle<()> {
+    std::thread::spawn(move || {
+        let tray_menu = Menu::new();
+        let tray_icon = TrayIconBuilder::new()
+            .with_menu(Box::new(tray_menu))
+            .with_tooltip("Reminders")
+            .build()
+            .unwrap();
+        loop {
+            if let Ok(event) = receiver.try_recv() {
+                match event {
+                    ReminderEvent::Exit => break,
+                }
+            }
+            if let Ok(event) = MenuEvent::receiver().try_recv() {
+                println!("{:?}", event);
+            }
+            if let Ok(event) = TrayIconEvent::receiver().try_recv() {
+                println!("{:?}", event);
+            }
+        }
+    })
 }
