@@ -5,7 +5,7 @@ A reminder app.
 Rename binary to `schedule` and add it your `PATH`, then run `schedule run` to set reminders to active.
 
 ## Example Save
-A json file should be placed under `C:\Users\[USER]\AppData\Roaming\Rusty Notifier\data`:
+A json file should be placed under `C:\Users\[USER]\AppData\Roaming\Rusty Notifier\data\reminders.json`:
 ```json
 {
     "reminders": {
