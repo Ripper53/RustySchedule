@@ -1,51 +1,55 @@
+#![windows_subsystem = "windows"]
 use std::{io::{self, Write}, sync::mpsc::{channel, Receiver, Sender}, thread::JoinHandle, time::Duration};
 
-use args::ScheduleCommand;
+use args::{ScheduleCli, ScheduleCommand};
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode};
 use directories::ProjectDirs;
 use notify_rust::Notification;
 use rusty_schedule_core::{Notifier, NotifierBuilder};
 #[cfg(feature = "tray")]
-use tray_icon::{TrayIconBuilder, TrayIcon, TrayIconEvent, menu::{Menu, MenuEvent}};
+use tray_icon::{TrayIconBuilder, TrayIcon, TrayIconEvent, ClickType, Icon, menu::{Menu, MenuItem, MenuEvent, Submenu}};
+#[cfg(feature = "tray")]
+use winit::event_loop::EventLoopBuilder;
 
 mod args;
 #[cfg(feature = "tui")]
 mod tui;
 
 fn main() -> std::io::Result<()> {
-    let command = ScheduleCommand::parse();
-    match command {
-        ScheduleCommand::Run => {
-            if let Some(dirs) = ProjectDirs::from("", "", "Rusty Notifier") {
-                let data_path = dirs.data_dir();
-                let (listener_sender, listener_receiver) = channel();
-                #[cfg(feature = "tray")]
-                let (tray_sender, tray_receiver) = channel();
-                #[cfg(feature = "tray")]
-                let tray_handler = create_tray_icon(tray_receiver);
-                let listener_handler = match Notifier::load(data_path.join("reminders.json")) {
-                    Ok(notifier) => listen(notifier, listener_receiver),
-                    Err(e) => panic!("Error loading reminders: {e}"),
-                };
-                controls(
-                    listener_handler,
-                    listener_sender,
-                    #[cfg(feature = "tray")]
-                    tray_handler,
-                    #[cfg(feature = "tray")]
-                    tray_sender,
-                )?;
-            } else {
-                panic!("No home directory found");
-            }
-        },
-        #[cfg(feature = "tui")]
-        ScheduleCommand::UserInterface => {
-            tui::tui_setup()?;
-        },
+    let command = ScheduleCli::parse();
+    if let Some(command) = command.command {
+        match command {
+            ScheduleCommand::Run => run(),
+            #[cfg(feature = "tui")]
+            ScheduleCommand::UserInterface => {
+                tui::tui_setup()?;
+            },
+        }
+    } else {
+        run();
     }
     Ok(())
+}
+
+fn run() {
+    if let Some(dirs) = ProjectDirs::from("", "", "Rusty Notifier") {
+        let data_path = dirs.data_dir();
+        let (listener_sender, listener_receiver) = channel();
+        let listener_handler = match Notifier::load(data_path.join("reminders.json")) {
+            Ok(notifier) => listen(notifier, listener_receiver),
+            Err(e) => panic!("Error loading reminders: {e}"),
+        };
+        #[cfg(feature = "tray")]
+        create_tray_icon();
+        #[cfg(not(feature = "tray"))]
+        controls(
+            listener_handler,
+            listener_sender,
+        )?;
+    } else {
+        panic!("No home directory found");
+    }
 }
 
 enum ReminderEvent {
@@ -76,10 +80,6 @@ fn listen(mut notifier: Notifier, mut receiver: Receiver<ReminderEvent>) -> Join
 fn controls(
     listener_handler: JoinHandle<()>,
     listener_sender: Sender<ReminderEvent>,
-    #[cfg(feature = "tray")]
-    tray_handler: JoinHandle<()>,
-    #[cfg(feature = "tray")]
-    tray_sender: Sender<ReminderEvent>,
 ) -> io::Result<()> {
     println!("Reminders listening... Press ESC to stop.");
     loop {
@@ -89,7 +89,6 @@ fn controls(
                 match key.code {
                     KeyCode::Esc => {
                         listener_sender.send(ReminderEvent::Exit).unwrap();
-                        tray_sender.send(ReminderEvent::Exit).unwrap();
                         break;
                     },
                     _ => {},
@@ -99,36 +98,54 @@ fn controls(
     }
     print!("Closing listeners...");
     io::stdout().flush();
-    loop {
-        if listener_handler.is_finished() && tray_handler.is_finished() {
-            break;
-        }
-    }
+    wait_for_thread_close(listener_handler);
     println!(" Closed!");
     Ok(())
 }
 
+fn wait_for_thread_close(listener_handler: JoinHandle<()>) {
+    loop {
+        if listener_handler.is_finished() {
+            break;
+        }
+    }
+}
+
 #[cfg(feature = "tray")]
-fn create_tray_icon(mut receiver: Receiver<ReminderEvent>) -> JoinHandle<()> {
-    std::thread::spawn(move || {
-        let tray_menu = Menu::new();
-        let tray_icon = TrayIconBuilder::new()
-            .with_menu(Box::new(tray_menu))
-            .with_tooltip("Reminders")
-            .build()
-            .unwrap();
-        loop {
-            if let Ok(event) = receiver.try_recv() {
-                match event {
-                    ReminderEvent::Exit => break,
-                }
-            }
-            if let Ok(event) = MenuEvent::receiver().try_recv() {
-                println!("{:?}", event);
-            }
-            if let Ok(event) = TrayIconEvent::receiver().try_recv() {
-                println!("{:?}", event);
+fn create_tray_icon() {
+    let tray_menu = Menu::new();
+    let quit_menu_item = Box::new(MenuItem::new("Quit", true, None));
+
+    tray_menu.append(quit_menu_item.as_ref());
+    let tray_icon = TrayIconBuilder::new()
+        .with_menu(Box::new(tray_menu))
+        .with_icon(load_icon())
+        .with_tooltip("Reminders")
+        .build()
+        .unwrap();
+    let event_loop = EventLoopBuilder::new().build().unwrap();
+    event_loop.run(move |event, event_loop| {
+        if event_loop.exiting() {
+            return;
+        }
+        if let Ok(event) = MenuEvent::receiver().try_recv() {
+            if event.id() == quit_menu_item.id() {
+                event_loop.exit();
+                return;
             }
         }
-    })
+    });
+}
+
+#[cfg(feature = "tray")]
+fn load_icon() -> Icon {
+    let (icon_rgba, icon_width, icon_height) = {
+        let image = image::open(std::path::Path::new("./icon.png"))
+            .expect("Failed to open icon path")
+            .into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        (rgba, width, height)
+    };
+    Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
 }
