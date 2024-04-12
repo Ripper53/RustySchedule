@@ -2,10 +2,13 @@
 
 A reminder app.
 
+## Tray Icon (Default)
+Launch `.exe`, it will launch in a tray icon. You can right-click tray icon, and click the `Quit` button to close it.
+
 ## CLI
 Rename binary to `schedule` and add it your `PATH`, then run `schedule run` to set reminders to active.
 
-### Example Save
+## Example Save
 A json file should be placed under `C:\Users\[USER]\AppData\Roaming\Rusty Notifier\data`:
 ```json
 {
@@ -26,9 +29,6 @@ A json file should be placed under `C:\Users\[USER]\AppData\Roaming\Rusty Notifi
 `open` can be a URL or point to an application. It can be an array or string.
 Once the reminder hits, it will open the URL in your browser or open the application.
 NOTE: make sure the URL includes the `www.`
-
-## Tray Icon
-Launch `.exe`, it will launch in a tray icon. You can right-click tray icon, and click the `Quit` button to close it.
 
 ---
 Icon was A.I. generated, then I made a 32x32 version from the original 1028x1028 that the A.I. generated.
