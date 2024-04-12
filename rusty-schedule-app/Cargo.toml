@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 rusty-schedule-core = { path = "../rusty-schedule-core" }
+rusty-schedule-app-macro = { path = "../rusty-schedule-app-macro" }
 notify-rust = "4.10.0"
 directories = "5.0.1"
 clap = { version = "4.4.18", features = ["derive"] }
@@ -17,7 +18,6 @@ tui-textarea = { version = "0.4.0", optional = true }
 tui-input = { version = "0.8.0", optional = true }
 tray-icon = { version = "0.13.1", optional = true }
 winit = { version = "0.29.15", optional = true }
-image = { version = "0.25.1", optional = true }
 
 [features]
 #default = ["tui"] -- TUI throws compile errors for now
@@ -25,7 +25,6 @@ default = ["tray"]
 tray = [
     "dep:tray-icon",
     "dep:winit",
-    "dep:image",
 ]
 tui = [
     "dep:ratatui",

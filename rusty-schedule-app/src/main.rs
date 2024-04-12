@@ -141,25 +141,11 @@ fn create_tray_icon() {
 
 #[cfg(feature = "tray")]
 fn load_icon() -> Option<Icon> {
-    let (icon_rgba, icon_width, icon_height) = {
-        let path = std::path::Path::new("./icon.png");
-        println!("{path:?}");
-        let icon = match image::open(path) {
-            Ok(icon) => icon.into_rgb8(),
-            Err(e) => {
-                println!("Error (150): {e:?}");
-                return None;
-            },
-        };
-        let (width, height) = icon.dimensions();
-        let rgba = icon.into_raw();
-        (rgba, width, height)
-    };
-    println!("RGBA: {}", icon_rgba.len());
+    let (icon_rgba, icon_width, icon_height) = rusty_schedule_app_macro::preload_icon!();
     match Icon::from_rgba(icon_rgba, icon_width, icon_height) {
         Ok(icon) => Some(icon),
         Err(e) => {
-            println!("Error (162): {e:?}");
+            println!("{e}");
             None
         },
     }
