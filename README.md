@@ -25,3 +25,5 @@ A json file should be placed under `C:\Users\[USER]\AppData\Roaming\Rusty Notifi
 `open` can be a URL or point to an application. It can be an array or string.
 Once the reminder hits, it will open the URL in your browser or open the application.
 NOTE: make sure the URL includes the `www.`
+
+Icon was A.I. generated, then I made a 32x32 version from the original 1028x1028 that the A.I. generated.

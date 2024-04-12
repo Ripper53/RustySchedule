@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 use std::{io::{self, Write}, sync::mpsc::{channel, Receiver, Sender}, thread::JoinHandle, time::Duration};
 
 use args::{ScheduleCli, ScheduleCommand};
@@ -77,6 +77,7 @@ fn listen(mut notifier: Notifier, mut receiver: Receiver<ReminderEvent>) -> Join
     })
 }
 
+#[cfg(not(feature = "tray"))]
 fn controls(
     listener_handler: JoinHandle<()>,
     listener_sender: Sender<ReminderEvent>,
@@ -98,17 +99,13 @@ fn controls(
     }
     print!("Closing listeners...");
     io::stdout().flush();
-    wait_for_thread_close(listener_handler);
-    println!(" Closed!");
-    Ok(())
-}
-
-fn wait_for_thread_close(listener_handler: JoinHandle<()>) {
     loop {
         if listener_handler.is_finished() {
             break;
         }
     }
+    println!(" Closed!");
+    Ok(())
 }
 
 #[cfg(feature = "tray")]
@@ -118,8 +115,14 @@ fn create_tray_icon() {
 
     tray_menu.append(quit_menu_item.as_ref());
     let tray_icon = TrayIconBuilder::new()
-        .with_menu(Box::new(tray_menu))
-        .with_icon(load_icon())
+        .with_menu(Box::new(tray_menu));
+    let tray_icon = if let Some(icon) = load_icon() {
+        tray_icon.with_icon(icon)
+    } else {
+        //panic!("NO ICON");
+        tray_icon
+    };
+    let tray_icon = tray_icon
         .with_tooltip("Reminders")
         .build()
         .unwrap();
@@ -131,21 +134,33 @@ fn create_tray_icon() {
         if let Ok(event) = MenuEvent::receiver().try_recv() {
             if event.id() == quit_menu_item.id() {
                 event_loop.exit();
-                return;
             }
         }
     });
 }
 
 #[cfg(feature = "tray")]
-fn load_icon() -> Icon {
+fn load_icon() -> Option<Icon> {
     let (icon_rgba, icon_width, icon_height) = {
-        let image = image::open(std::path::Path::new("./icon.png"))
-            .expect("Failed to open icon path")
-            .into_rgba8();
-        let (width, height) = image.dimensions();
-        let rgba = image.into_raw();
+        let path = std::path::Path::new("./icon.png");
+        println!("{path:?}");
+        let icon = match image::open(path) {
+            Ok(icon) => icon.into_rgb8(),
+            Err(e) => {
+                println!("Error (150): {e:?}");
+                return None;
+            },
+        };
+        let (width, height) = icon.dimensions();
+        let rgba = icon.into_raw();
         (rgba, width, height)
     };
-    Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
+    println!("RGBA: {}", icon_rgba.len());
+    match Icon::from_rgba(icon_rgba, icon_width, icon_height) {
+        Ok(icon) => Some(icon),
+        Err(e) => {
+            println!("Error (162): {e:?}");
+            None
+        },
+    }
 }
