@@ -1,4 +1,4 @@
-//#![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 use std::{io::{self, Write}, sync::mpsc::{channel, Receiver, Sender}, thread::JoinHandle, time::Duration};
 
 use args::{ScheduleCli, ScheduleCommand};
