@@ -27,12 +27,11 @@ fn main() -> std::io::Result<()> {
             },
         }
     } else {
-        run();
+        run()
     }
-    Ok(())
 }
 
-fn run() {
+fn run() -> io::Result<()> {
     if let Some(dirs) = ProjectDirs::from("", "", "Rusty Notifier") {
         let data_path = dirs.data_dir();
         let (listener_sender, listener_receiver) = channel();
@@ -47,6 +46,7 @@ fn run() {
             listener_handler,
             listener_sender,
         )?;
+        Ok(())
     } else {
         panic!("No home directory found");
     }
