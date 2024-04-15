@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 rusty-schedule-core = { path = "../rusty-schedule-core" }
-rusty-schedule-app-macro = { path = "../rusty-schedule-app-macro" }
+rusty-schedule-app-macro = { path = "../rusty-schedule-app-macro", optional = true }
 notify-rust = "4.10.0"
 directories = "5.0.1"
 clap = { version = "4.4.18", features = ["derive"] }
@@ -25,6 +25,7 @@ default = ["tray"]
 tray = [
     "dep:tray-icon",
     "dep:winit",
+    "rusty-schedule-app-macro",
 ]
 tui = [
     "dep:ratatui",
